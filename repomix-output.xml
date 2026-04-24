@@ -40,6 +40,7 @@ The content is organized as follows:
 </file_summary>
 
 <directory_structure>
+.env.example
 .gitignore
 .prettierrc
 eslint.config.mjs
@@ -51,6 +52,8 @@ prisma/migrations/20260421002428_add_password/migration.sql
 prisma/migrations/20260421155414_change_user_id_type/migration.sql
 prisma/migrations/20260421160913_change_user_model/migration.sql
 prisma/migrations/20260421212826_update_user_model/migration.sql
+prisma/migrations/20260424130536_add_token_version_and_indexes/migration.sql
+prisma/migrations/20260424135550_add_account_lockout/migration.sql
 prisma/migrations/migration_lock.toml
 prisma/schema.prisma
 README.md
@@ -77,6 +80,7 @@ src/common/middleware/logging.middleware.ts
 src/config/config.module.ts
 src/health/health.controller.spec.ts
 src/health/health.controller.ts
+src/mail/mail.module.ts
 src/mail/mail.service.spec.ts
 src/mail/mail.service.ts
 src/main.ts
@@ -100,6 +104,65 @@ tsconfig.json
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="prisma/migrations/20260424130536_add_token_version_and_indexes/migration.sql">
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "tokenVersion" INTEGER NOT NULL DEFAULT 0;
+
+-- CreateIndex
+CREATE INDEX "User_verifyToken_idx" ON "User"("verifyToken");
+
+-- CreateIndex
+CREATE INDEX "User_resetToken_idx" ON "User"("resetToken");
+</file>
+
+<file path="prisma/migrations/20260424135550_add_account_lockout/migration.sql">
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "failedLoginAttempts" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "lockedUntil" TIMESTAMP(3);
+</file>
+
+<file path="src/mail/mail.module.ts">
+import { Module } from '@nestjs/common';
+import { MailService } from './mail.service';
+
+@Module({
+  providers: [MailService],
+  exports: [MailService],
+})
+export class MailModule {}
+</file>
+
+<file path=".env.example">
+# App
+NODE_ENV=development
+PORT=3000
+APP_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:5173
+
+# Database
+DATABASE_URL="postgresql://user:password@localhost:5432/mydb"
+
+# JWT
+JWT_SECRET=your-super-secret-jwt-key
+JWT_EXPIRES_IN=15m
+JWT_REFRESH_SECRET=your-super-secret-refresh-key
+JWT_REFRESH_EXPIRES_IN=7d
+
+# CORS
+CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+
+# Mail
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USER=your-email@gmail.com
+MAIL_PASS=your-app-password
+MAIL_FROM="No Reply <noreply@app.com>"
+
+# Cache (optional Redis)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+</file>
 
 <file path=".gitignore">
 # compiled output
@@ -160,6 +223,12 @@ pids
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 /src/generated/prisma
+
+repomix-output.xml
+
+# exclude all md files except README.md
+*.md
+!README.md
 </file>
 
 <file path=".prettierrc">
@@ -447,113 +516,17 @@ model User {
   verifyTokenExpiry DateTime?
   resetToken        String?
   resetTokenExpiry  DateTime?
+  tokenVersion      Int      @default(0)
+  failedLoginAttempts Int    @default(0)
+  lockedUntil       DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([email])
+  @@index([verifyToken])
+  @@index([resetToken])
 }
-</file>
-
-<file path="README.md">
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
-
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
-
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
-
-## Description
-
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ npm install
-```
-
-## Compile and run the project
-
-```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
-```
-
-## Run tests
-
-```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 </file>
 
 <file path="src/app.controller.spec.ts">
@@ -604,7 +577,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { AppConfigModule } from './config/config.module';
 import { AuthModule } from './auth/auth.module';
-import { MailService } from './mail/mail.service';
+import { MailModule } from './mail/mail.module';
 import { HealthController } from './health/health.controller';
 import { TerminusModule } from '@nestjs/terminus';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -618,13 +591,14 @@ import { UploadModule } from './upload/upload.module';
     UsersModule,
     AppConfigModule,
     AuthModule,
+    MailModule,
     TerminusModule,
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     CacheModule.register({ isGlobal: true, ttl: 300, max: 1000 }),
     UploadModule,
   ],
   controllers: [AppController, HealthController],
-  providers: [AppService, MailService],
+  providers: [AppService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
@@ -646,7 +620,16 @@ export class AppService {
 
 <file path="src/auth/auth.controller.ts">
 // src/auth/auth.controller.ts
-import { Body, Controller, Get, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import {
   RegisterDto,
@@ -661,32 +644,44 @@ import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { User } from '../generated/prisma/client';
+import { Public } from '../common/decorators/public.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  // 10 attempts per hour
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 3600000 } })
   @Post('register')
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
 
+  // 5 attempts per minute
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('login')
   login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     return this.authService.login(dto, res);
   }
 
+  @Public()
   @Post('verify-email')
   verifyEmail(@Body() dto: VerifyEmailDto) {
     return this.authService.verifyEmail(dto);
   }
 
+  // 3 attempts per hour
+  @Public()
+  @Throttle({ default: { limit: 3, ttl: 3600000 } })
   @Post('forgot-password')
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto);
   }
 
+  @Public()
   @Post('reset-password')
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
@@ -700,8 +695,8 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('logout')
-  logout(@Res({ passthrough: true }) res: Response) {
-    return this.authService.logout(res);
+  logout(@CurrentUser() user: any, @Res({ passthrough: true }) res: Response) {
+    return this.authService.logout(user.id, res);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -723,12 +718,12 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { PrismaModule } from '../prisma/prisma.module';
-import { MailService } from '../mail/mail.service';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
-  imports: [PrismaModule, PassportModule, JwtModule.register({})],
+  imports: [PrismaModule, PassportModule, JwtModule.register({}), MailModule],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtRefreshStrategy, MailService],
+  providers: [AuthService, JwtStrategy, JwtRefreshStrategy],
   exports: [AuthService],
 })
 export class AuthModule {}
@@ -736,11 +731,7 @@ export class AuthModule {}
 
 <file path="src/auth/auth.service.ts">
 // src/auth/auth.service.ts
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -774,15 +765,29 @@ export class AuthService {
     return new Date(Date.now() + hours * 60 * 60 * 1000);
   }
 
-  private signTokens(payload: { sub: string; email: string }) {
-    const accessToken = this.jwt.sign(payload, {
-      secret: this.config.get('JWT_SECRET'),
-      expiresIn: this.config.get('JWT_EXPIRES_IN'),
-    });
-    const refreshToken = this.jwt.sign(payload, {
-      secret: this.config.get('JWT_REFRESH_SECRET'),
-      expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN'),
-    });
+  private signTokens(payload: {
+    sub: string;
+    email: string;
+    tokenVersion: number;
+  }) {
+    const jti = crypto.randomUUID();
+
+    const accessToken = this.jwt.sign(
+      { ...payload, jti },
+      {
+        secret: this.config.get('JWT_SECRET'),
+        expiresIn: this.config.get('JWT_EXPIRES_IN'),
+      },
+    );
+
+    const refreshToken = this.jwt.sign(
+      { ...payload, jti: crypto.randomUUID() },
+      {
+        secret: this.config.get('JWT_REFRESH_SECRET'),
+        expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN'),
+      },
+    );
+
     return { accessToken, refreshToken };
   }
 
@@ -805,18 +810,28 @@ export class AuthService {
     const hashed = await bcrypt.hash(dto.password, 12);
     const verifyToken = this.generateToken();
 
-    const user = await this.prisma.user.create({
-      data: {
-        name: dto.name,
-        email: dto.email,
-        password: hashed,
+    // Use transaction to ensure user + email are atomic
+    const user = await this.prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          name: dto.name,
+          email: dto.email,
+          password: hashed,
+          verifyToken,
+          verifyTokenExpiry: this.tokenExpiry(24),
+        },
+      });
+
+      await this.mail.sendVerificationEmail(
+        newUser.email,
+        newUser.name,
         verifyToken,
-        verifyTokenExpiry: this.tokenExpiry(24),
-      },
+      );
+
+      return newUser;
     });
 
-    await this.mail.sendVerificationEmail(user.email, user.name, verifyToken);
-
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password: _, ...result } = user;
     return { ...result, message: 'Check your email to verify your account' };
   }
@@ -849,15 +864,54 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
+
     if (!user) throw new BadRequestException('Invalid credentials');
 
-    const valid = await bcrypt.compare(dto.password, user.password);
-    if (!valid) throw new BadRequestException('Invalid credentials');
+    // ─── Check if account is locked ─────────────────────────
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      throw new BadRequestException(
+        `Account locked. Try again after ${user.lockedUntil.toISOString()}`,
+      );
+    }
 
+    // ─── Validate password ──────────────────────────────────
+    const valid = await bcrypt.compare(dto.password, user.password);
+
+    if (!valid) {
+      const attempts: number = user.failedLoginAttempts + 1;
+      const updateData: any = { failedLoginAttempts: attempts };
+
+      // Lock account after 5 failed attempts for 30 minutes
+      if (attempts >= 5) {
+        updateData.lockedUntil = new Date(Date.now() + 30 * 60 * 1000);
+        updateData.failedLoginAttempts = 0;
+      }
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: updateData,
+      });
+
+      throw new BadRequestException('Invalid credentials');
+    }
+
+    // ─── Reset failed attempts on successful login ──────────
+    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0, lockedUntil: null },
+      });
+    }
+
+    // ─── Continue with token generation ─────────────────────
     if (!user.emailVerified)
       throw new BadRequestException('Please verify your email first');
 
-    const payload = { sub: user.id, email: user.email };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      tokenVersion: user.tokenVersion,
+    };
     const { accessToken, refreshToken } = this.signTokens(payload);
     this.setRefreshCookie(res, refreshToken);
 
@@ -869,7 +923,11 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new BadRequestException('User not found');
 
-    const payload = { sub: user.id, email: user.email };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      tokenVersion: user.tokenVersion,
+    };
     const { accessToken, refreshToken } = this.signTokens(payload);
     this.setRefreshCookie(res, refreshToken);
 
@@ -877,7 +935,11 @@ export class AuthService {
   }
 
   // ─── logout ──────────────────────────────────────────────
-  logout(res: Response) {
+  async logout(userId: string, res: Response) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+    });
     res.clearCookie('refresh_token');
     return { message: 'Logged out' };
   }
@@ -888,8 +950,9 @@ export class AuthService {
       where: { email: dto.email },
     });
 
-    // مش بنقول للـ client لو الإيميل موجود ولا لا (security)
-    if (!user) return { message: 'If this email exists, a reset link was sent' };
+    // Don't reveal if email exists to client (security)
+    if (!user)
+      return { message: 'If this email exists, a reset link was sent' };
 
     const resetToken = this.generateToken();
 
@@ -925,6 +988,7 @@ export class AuthService {
         password: hashed,
         resetToken: null,
         resetTokenExpiry: null,
+        tokenVersion: { increment: 1 },
       },
     });
 
@@ -964,15 +1028,30 @@ export class VerifyEmailDto {
 </file>
 
 <file path="src/auth/guards/jwt-auth.guard.ts">
-import { Injectable } from '@nestjs/common';
+import { Injectable, ExecutionContext } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
+import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
 
 @Injectable()
-export class JwtAuthGuard extends AuthGuard('jwt') {}
+export class JwtAuthGuard extends AuthGuard('jwt') {
+  constructor(private reflector: Reflector) {
+    super();
+  }
+
+  canActivate(context: ExecutionContext) {
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) return true;
+    return super.canActivate(context);
+  }
+}
 </file>
 
 <file path="src/auth/guards/jwt-refresh.guard.ts">
-import { Injectable } from "@nestjs/common";
+import { Injectable } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 
 @Injectable()
@@ -985,13 +1064,17 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy, StrategyOptionsWithRequest } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class JwtRefreshStrategy extends PassportStrategy(
   Strategy,
   'jwt-refresh',
 ) {
-  constructor(config: ConfigService) {
+  constructor(
+    config: ConfigService,
+    private prisma: PrismaService,
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (request: Request) => {
@@ -1003,9 +1086,23 @@ export class JwtRefreshStrategy extends PassportStrategy(
     } as StrategyOptionsWithRequest);
   }
 
-  async validate(req: Request, payload: any) {
+  async validate(
+    req: Request,
+    payload: { sub: string; email: string; tokenVersion: number },
+  ) {
     const refreshToken = req.cookies?.refresh_token;
     if (!refreshToken) throw new UnauthorizedException();
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
+    if (!user) throw new UnauthorizedException();
+
+    // If tokenVersion doesn't match, the token has been invalidated
+    if (user.tokenVersion !== payload.tokenVersion) {
+      throw new UnauthorizedException('Token has been revoked');
+    }
+
     return { ...payload, refreshToken };
   }
 }
@@ -1031,12 +1128,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     } as StrategyOptionsWithRequest);
   }
 
-  async validate(payload: { sub: string; email: string }) {
+  async validate(payload: {
+    sub: string;
+    email: string;
+    tokenVersion: number;
+  }) {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
     });
 
     if (!user) throw new UnauthorizedException();
+
+    // Validate tokenVersion for access tokens as well (optional but recommended for full revocation)
+    if (user.tokenVersion !== payload.tokenVersion) {
+      throw new UnauthorizedException('Token has been revoked');
+    }
+
     const { password: _, ...result } = user;
     return result;
   }
@@ -1064,7 +1171,11 @@ export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 <file path="src/common/decorators/roles.decorator.ts">
 import { SetMetadata } from '@nestjs/common';
 
-export enum Role { ADMIN = 'ADMIN', USER = 'USER', MODERATOR = 'MODERATOR' }
+export enum Role {
+  ADMIN = 'ADMIN',
+  USER = 'USER',
+  MODERATOR = 'MODERATOR',
+}
 export const ROLES_KEY = 'roles';
 export const Roles = (...roles: Role[]) => SetMetadata(ROLES_KEY, roles);
 </file>
@@ -1124,7 +1235,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
 <file path="src/common/guards/roles.guard.ts">
 // src/common/guards/roles.guard.ts
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY, Role } from '../decorators/roles.decorator';
 
@@ -1201,15 +1317,17 @@ import { map } from 'rxjs/operators';
 @Injectable()
 export class ResponseInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    return next
-      .handle()
-      .pipe(
-        map((data) =>
-          data?.hasOwnProperty('data')
-            ? { success: !0, ...data, timestamp: new Date().toISOString() }
-            : { success: !0, data: data, timestamp: new Date().toISOString() },
-        ),
-      );
+    return next.handle().pipe(
+      map((data) =>
+        data?.hasOwnProperty('data')
+          ? { success: true, ...data, timestamp: new Date().toISOString() }
+          : {
+              success: true,
+              data: data,
+              timestamp: new Date().toISOString(),
+            },
+      ),
+    );
   }
 }
 </file>
@@ -1218,18 +1336,26 @@ export class ResponseInterceptor implements NestInterceptor {
 // src/common/middleware/logging.middleware.ts
 import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class LoggingMiddleware implements NestMiddleware {
   private readonly logger = new Logger('HTTP');
 
   use(req: Request, res: Response, next: NextFunction) {
+    const requestId = randomUUID();
+    req['requestId'] = requestId;
+    res.setHeader('X-Request-Id', requestId);
+
     const { method, originalUrl } = req;
     const start = Date.now();
+
     res.on('finish', () => {
       const { statusCode } = res;
       const ms = Date.now() - start;
-      this.logger.log(`${method} ${originalUrl} ${statusCode} — ${ms}ms`);
+      this.logger.log(
+        `[${requestId}] ${method} ${originalUrl} ${statusCode} — ${ms}ms`,
+      );
     });
     next();
   }
@@ -1248,7 +1374,9 @@ import * as Joi from 'joi';
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({
-        NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
+        NODE_ENV: Joi.string()
+          .valid('development', 'production', 'test')
+          .default('development'),
         PORT: Joi.number().default(3000),
         DATABASE_URL: Joi.string().required(),
         JWT_SECRET: Joi.string().required(),
@@ -1261,6 +1389,8 @@ import * as Joi from 'joi';
         MAIL_USER: Joi.string().allow('').optional(),
         MAIL_PASS: Joi.string().allow('').optional(),
         MAIL_FROM: Joi.string().required(),
+        APP_URL: Joi.string().default('http://localhost:3000'),
+        FRONTEND_URL: Joi.string().default('http://localhost:5173'),
       }),
     }),
   ],
@@ -1292,7 +1422,11 @@ describe('HealthController', () => {
 <file path="src/health/health.controller.ts">
 // src/health/health.controller.ts
 import { Controller, Get } from '@nestjs/common';
-import { HealthCheck, HealthCheckService, PrismaHealthIndicator } from '@nestjs/terminus';
+import {
+  HealthCheck,
+  HealthCheckService,
+  PrismaHealthIndicator,
+} from '@nestjs/terminus';
 import { PrismaService } from '../prisma/prisma.service';
 import { ApiTags } from '@nestjs/swagger';
 
@@ -1412,7 +1546,11 @@ export class MailService {
 
 <file path="src/main.ts">
 import { NestFactory, Reflector } from '@nestjs/core';
-import { ValidationPipe, ClassSerializerInterceptor } from '@nestjs/common';
+import {
+  ValidationPipe,
+  ClassSerializerInterceptor,
+  BadRequestException,
+} from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
@@ -1452,6 +1590,18 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transform: true, // auto-cast types
       transformOptions: { enableImplicitConversion: true },
+      exceptionFactory: (errors) => {
+        const messages = errors.map((e) => ({
+          field: e.property,
+          errors: Object.values(e.constraints || {}),
+        }));
+        return new BadRequestException({
+          statusCode: 400,
+          message: 'Validation failed',
+          errors: messages,
+          timestamp: new Date().toISOString(),
+        });
+      },
     }),
   );
 
@@ -1499,6 +1649,7 @@ export class PrismaModule {}
 
 <file path="src/prisma/prisma.service.ts">
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaClient } from '../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 
@@ -1507,10 +1658,11 @@ export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
-  constructor() {
+  constructor(private config: ConfigService) {
+    const isProd = config.get('NODE_ENV') === 'production';
     const adapter = new PrismaPg({
-      connectionString: process.env.DATABASE_URL,
-      ssl: true,
+      connectionString: config.get('DATABASE_URL'),
+      ssl: isProd,
     });
     super({ adapter });
   }
@@ -1549,14 +1701,19 @@ describe('UploadController', () => {
 <file path="src/upload/upload.controller.ts">
 // src/upload/upload.controller.ts
 import {
-  Controller, Post, UploadedFile, UploadedFiles,
-  UseGuards, UseInterceptors,
+  Controller,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UploadService } from './upload.service';
-import { memoryStorage } from 'multer';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import { randomUUID } from 'crypto';
 
 @ApiTags('Upload')
 @ApiBearerAuth()
@@ -1567,27 +1724,53 @@ export class UploadController {
 
   @Post('image')
   @ApiConsumes('multipart/form-data')
-  @ApiBody({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } })
-  @UseInterceptors(FileInterceptor('file', {
-    storage: memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-    fileFilter: (_, file, cb) => {
-      const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-      if (allowed.includes(file.mimetype)) cb(null, true);
-      else cb(new Error('Only images allowed'), false);
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
     },
-  }))
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, cb) => {
+          const ext = extname(file.originalname);
+          cb(null, `${randomUUID()}${ext}`);
+        },
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+      fileFilter: (_, file, cb) => {
+        const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+        if (allowed.includes(file.mimetype)) cb(null, true);
+        else cb(new Error('Only images allowed'), false);
+      },
+    }),
+  )
   uploadImage(@UploadedFile() file: Express.Multer.File) {
     return this.uploadService.saveFile(file);
   }
 
   @Post('file')
   @ApiConsumes('multipart/form-data')
-  @ApiBody({ schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } } } })
-  @UseInterceptors(FileInterceptor('file', {
-    storage: memoryStorage(),
-    limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
-  }))
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, cb) => {
+          const ext = extname(file.originalname);
+          cb(null, `${randomUUID()}${ext}`);
+        },
+      }),
+      limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+    }),
+  )
   uploadFile(@UploadedFile() file: Express.Multer.File) {
     return this.uploadService.saveFile(file);
   }
@@ -1634,32 +1817,31 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as crypto from 'crypto';
 
 @Injectable()
 export class UploadService {
   private uploadDir = path.join(process.cwd(), 'uploads');
 
   constructor(private config: ConfigService) {
-    // إنشاء الـ folder لو مش موجود
+    // Create uploads directory if it doesn't exist
     if (!fs.existsSync(this.uploadDir)) {
       fs.mkdirSync(this.uploadDir, { recursive: true });
     }
   }
 
-  async saveFile(file: Express.Multer.File): Promise<{ url: string; filename: string; size: number }> {
-    const ext = path.extname(file.originalname);
-    const filename = `${crypto.randomBytes(16).toString('hex')}${ext}`;
-    const filepath = path.join(this.uploadDir, filename);
-
-    fs.writeFileSync(filepath, file.buffer);
+  saveFile(file: Express.Multer.File): Promise<{
+    url: string;
+    filename: string;
+    size: number;
+  }> {
+    const filename = file.filename;
 
     const baseUrl = this.config.get('APP_URL') ?? 'http://localhost:3000';
-    return {
+    return Promise.resolve({
       url: `${baseUrl}/uploads/${filename}`,
       filename,
       size: file.size,
-    };
+    });
   }
 }
 </file>
@@ -1724,41 +1906,37 @@ export class UsersController {
   @Get()
   async getUsers(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('pageSize', new DefaultValuePipe(10), ParseIntPipe) pageSize: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
   ) {
-    return await this.usersService.getUsers(page, pageSize);
+    return await this.usersService.getUsers(page, limit);
   }
 
   @Get(':id')
   async getUserById(@Param('id') id: string) {
-    try {
-      const user = await this.usersService.getUserById(id);
-      if (!user) {
-        throw new NotFoundException(`User with id ${id} not found`);
-      }
-      return user;
-    } catch (error) {
-      throw error;
+    const user = await this.usersService.getUserById(id);
+    if (!user) {
+      throw new NotFoundException(`User with id ${id} not found`);
     }
+    return user;
   }
 
   @Post()
   @Roles(Role.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   async createUser(@Body() user: CreateUserDto) {
     return await this.usersService.createUser(user);
   }
 
   @Patch(':id')
   @Roles(Role.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   async updateUser(@Param('id') id: string, @Body() dto: UpdateUserDto) {
     return await this.usersService.updateUser(id, dto);
   }
 
   @Delete(':id')
   @Roles(Role.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   async deleteUser(@Param('id') id: string) {
     return await this.usersService.deleteUser(id);
   }
@@ -1774,7 +1952,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 @Module({
   imports: [PrismaModule],
   providers: [UsersService],
-  controllers: [UsersController]
+  controllers: [UsersController],
 })
 export class UsersModule {}
 </file>
@@ -1784,7 +1962,11 @@ import { Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dtos/create-user.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import type { Role } from '../generated/prisma/client';
-import { paginate, PaginatedResult } from '../common/helpers/pagination.helper';
+import {
+  paginate,
+  PaginatedResult,
+  getPrismaSkipTake,
+} from '../common/helpers/pagination.helper';
 import * as bcrypt from 'bcrypt';
 import { UpdateUserDto } from './dtos/update-user.dto';
 
@@ -1803,33 +1985,31 @@ type PublicUser = {
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  async getTotalUsers(): Promise<number> {
-    return await this.prisma.user.count();
-  }
-
   async getUsers(
     page: number,
-    pageSize: number,
+    limit: number,
   ): Promise<PaginatedResult<PublicUser>> {
-    const users = await this.prisma.user.findMany({
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        avatar: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    const { skip, take } = getPrismaSkipTake({ page, limit });
 
-    return paginate(users, await this.getTotalUsers(), {
-      page,
-      limit: pageSize,
-    });
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        skip,
+        take,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          avatar: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      this.prisma.user.count(),
+    ]);
+
+    return paginate(users, total, { page, limit });
   }
 
   async createUser(user: CreateUserDto): Promise<PublicUser | null> {
@@ -1837,6 +2017,7 @@ export class UsersService {
     const u = await this.prisma.user.create({
       data: { ...user, password: hashed },
     });
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password: _, ...result } = u;
     return result;
   }
@@ -1858,13 +2039,13 @@ export class UsersService {
   }
 
   async updateUser(id: string, dto: UpdateUserDto): Promise<PublicUser> {
-    const data: any = { ...dto };
+    const data = { ...dto };
     if (data.password) {
       data.password = await bcrypt.hash(data.password, 12);
     }
     const updated = await this.prisma.user.update({
       where: { id },
-      data,
+      data: data,
       select: {
         id: true,
         name: true,
@@ -1962,6 +2143,95 @@ describe('AppController (e2e)', () => {
     "noFallthroughCasesInSwitch": false
   }
 }
+</file>
+
+<file path="README.md">
+# NestJS Base Project
+
+A production-ready NestJS starter template for new projects.
+
+## Features
+
+- **Authentication**: JWT with access & refresh tokens
+- **Database**: Prisma ORM with PostgreSQL
+- **Validation**: class-validator & class-transformer
+- **API Documentation**: Swagger/OpenAPI
+- **Logging**: Winston logger
+- **Error Handling**: Global exception filter
+- **CORS**: Configurable CORS origins
+- **Rate Limiting**: Throttler guard
+- **Health Checks**: Terminus health endpoint
+- **File Upload**: Multer integration
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- PostgreSQL (or use Neon, Supabase, etc.)
+
+### Installation
+
+```bash
+npm install
+```
+
+### Configuration
+
+1. Copy `.env.example` to `.env`:
+
+```bash
+cp .env.example .env
+```
+
+2. Update the environment variables in `.env`
+
+3. Run Prisma migrations:
+
+```bash
+npx prisma migrate dev
+```
+
+### Running the App
+
+```bash
+# Development
+npm run start:dev
+
+# Production
+npm run build
+npm run start:prod
+```
+
+## Project Structure
+
+```
+src/
+├── auth/           # Authentication module
+├── config/         # Configuration module
+├── common/         # Shared decorators, guards, filters, interceptors
+├── health/         # Health check endpoints
+├── mail/           # Email service
+├── prisma/         # Prisma service
+├── upload/         # File upload module
+└── users/          # User management module
+```
+
+## API Documentation
+
+Once running, visit: `http://localhost:3000/api/docs`
+
+## Available Scripts
+
+- `npm run start` - Start the application
+- `npm run start:dev` - Start with hot reload
+- `npm run build` - Build for production
+- `npm run lint` - Lint and fix code
+- `npm run test` - Run tests
+
+## License
+
+UNLICENSED
 </file>
 
 </files>

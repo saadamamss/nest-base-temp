@@ -1,9 +1,5 @@
 // src/auth/auth.service.ts
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
@@ -37,15 +33,29 @@ export class AuthService {
     return new Date(Date.now() + hours * 60 * 60 * 1000);
   }
 
-  private signTokens(payload: { sub: string; email: string }) {
-    const accessToken = this.jwt.sign(payload, {
-      secret: this.config.get('JWT_SECRET'),
-      expiresIn: this.config.get('JWT_EXPIRES_IN'),
-    });
-    const refreshToken = this.jwt.sign(payload, {
-      secret: this.config.get('JWT_REFRESH_SECRET'),
-      expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN'),
-    });
+  private signTokens(payload: {
+    sub: string;
+    email: string;
+    tokenVersion: number;
+  }) {
+    const jti = crypto.randomUUID();
+
+    const accessToken = this.jwt.sign(
+      { ...payload, jti },
+      {
+        secret: this.config.get('JWT_SECRET'),
+        expiresIn: this.config.get('JWT_EXPIRES_IN'),
+      },
+    );
+
+    const refreshToken = this.jwt.sign(
+      { ...payload, jti: crypto.randomUUID() },
+      {
+        secret: this.config.get('JWT_REFRESH_SECRET'),
+        expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN'),
+      },
+    );
+
     return { accessToken, refreshToken };
   }
 
@@ -68,18 +78,28 @@ export class AuthService {
     const hashed = await bcrypt.hash(dto.password, 12);
     const verifyToken = this.generateToken();
 
-    const user = await this.prisma.user.create({
-      data: {
-        name: dto.name,
-        email: dto.email,
-        password: hashed,
+    // Use transaction to ensure user + email are atomic
+    const user = await this.prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          name: dto.name,
+          email: dto.email,
+          password: hashed,
+          verifyToken,
+          verifyTokenExpiry: this.tokenExpiry(24),
+        },
+      });
+
+      await this.mail.sendVerificationEmail(
+        newUser.email,
+        newUser.name,
         verifyToken,
-        verifyTokenExpiry: this.tokenExpiry(24),
-      },
+      );
+
+      return newUser;
     });
 
-    await this.mail.sendVerificationEmail(user.email, user.name, verifyToken);
-
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password: _, ...result } = user;
     return { ...result, message: 'Check your email to verify your account' };
   }
@@ -112,15 +132,54 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
+
     if (!user) throw new BadRequestException('Invalid credentials');
 
-    const valid = await bcrypt.compare(dto.password, user.password);
-    if (!valid) throw new BadRequestException('Invalid credentials');
+    // ─── Check if account is locked ─────────────────────────
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      throw new BadRequestException(
+        `Account locked. Try again after ${user.lockedUntil.toISOString()}`,
+      );
+    }
 
+    // ─── Validate password ──────────────────────────────────
+    const valid = await bcrypt.compare(dto.password, user.password);
+
+    if (!valid) {
+      const attempts: number = user.failedLoginAttempts + 1;
+      const updateData: any = { failedLoginAttempts: attempts };
+
+      // Lock account after 5 failed attempts for 30 minutes
+      if (attempts >= 5) {
+        updateData.lockedUntil = new Date(Date.now() + 30 * 60 * 1000);
+        updateData.failedLoginAttempts = 0;
+      }
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: updateData,
+      });
+
+      throw new BadRequestException('Invalid credentials');
+    }
+
+    // ─── Reset failed attempts on successful login ──────────
+    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0, lockedUntil: null },
+      });
+    }
+
+    // ─── Continue with token generation ─────────────────────
     if (!user.emailVerified)
       throw new BadRequestException('Please verify your email first');
 
-    const payload = { sub: user.id, email: user.email };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      tokenVersion: user.tokenVersion,
+    };
     const { accessToken, refreshToken } = this.signTokens(payload);
     this.setRefreshCookie(res, refreshToken);
 
@@ -132,7 +191,11 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new BadRequestException('User not found');
 
-    const payload = { sub: user.id, email: user.email };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      tokenVersion: user.tokenVersion,
+    };
     const { accessToken, refreshToken } = this.signTokens(payload);
     this.setRefreshCookie(res, refreshToken);
 
@@ -140,7 +203,11 @@ export class AuthService {
   }
 
   // ─── logout ──────────────────────────────────────────────
-  logout(res: Response) {
+  async logout(userId: string, res: Response) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+    });
     res.clearCookie('refresh_token');
     return { message: 'Logged out' };
   }
@@ -151,8 +218,9 @@ export class AuthService {
       where: { email: dto.email },
     });
 
-    // مش بنقول للـ client لو الإيميل موجود ولا لا (security)
-    if (!user) return { message: 'If this email exists, a reset link was sent' };
+    // Don't reveal if email exists to client (security)
+    if (!user)
+      return { message: 'If this email exists, a reset link was sent' };
 
     const resetToken = this.generateToken();
 
@@ -188,6 +256,7 @@ export class AuthService {
         password: hashed,
         resetToken: null,
         resetTokenExpiry: null,
+        tokenVersion: { increment: 1 },
       },
     });
 

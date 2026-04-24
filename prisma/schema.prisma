@@ -27,9 +27,14 @@ model User {
   verifyTokenExpiry DateTime?
   resetToken        String?
   resetTokenExpiry  DateTime?
+  tokenVersion      Int      @default(0)
+  failedLoginAttempts Int    @default(0)
+  lockedUntil       DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([email])
+  @@index([verifyToken])
+  @@index([resetToken])
 }

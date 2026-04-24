@@ -7,12 +7,12 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { PrismaModule } from '../prisma/prisma.module';
-import { MailService } from '../mail/mail.service';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
-  imports: [PrismaModule, PassportModule, JwtModule.register({})],
+  imports: [PrismaModule, PassportModule, JwtModule.register({}), MailModule],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtRefreshStrategy, MailService],
+  providers: [AuthService, JwtStrategy, JwtRefreshStrategy],
   exports: [AuthService],
 })
 export class AuthModule {}

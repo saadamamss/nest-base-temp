@@ -10,14 +10,16 @@ import { map } from 'rxjs/operators';
 @Injectable()
 export class ResponseInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    return next
-      .handle()
-      .pipe(
-        map((data) =>
-          data?.hasOwnProperty('data')
-            ? { success: !0, ...data, timestamp: new Date().toISOString() }
-            : { success: !0, data: data, timestamp: new Date().toISOString() },
-        ),
-      );
+    return next.handle().pipe(
+      map((data) =>
+        data?.hasOwnProperty('data')
+          ? { success: true, ...data, timestamp: new Date().toISOString() }
+          : {
+              success: true,
+              data: data,
+              timestamp: new Date().toISOString(),
+            },
+      ),
+    );
   }
 }

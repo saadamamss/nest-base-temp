@@ -9,7 +9,9 @@ import * as Joi from 'joi';
     ConfigModule.forRoot({
       isGlobal: true,
       validationSchema: Joi.object({
-        NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
+        NODE_ENV: Joi.string()
+          .valid('development', 'production', 'test')
+          .default('development'),
         PORT: Joi.number().default(3000),
         DATABASE_URL: Joi.string().required(),
         JWT_SECRET: Joi.string().required(),
@@ -22,6 +24,8 @@ import * as Joi from 'joi';
         MAIL_USER: Joi.string().allow('').optional(),
         MAIL_PASS: Joi.string().allow('').optional(),
         MAIL_FROM: Joi.string().required(),
+        APP_URL: Joi.string().default('http://localhost:3000'),
+        FRONTEND_URL: Joi.string().default('http://localhost:5173'),
       }),
     }),
   ],

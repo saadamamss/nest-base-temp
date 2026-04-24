@@ -30,41 +30,37 @@ export class UsersController {
   @Get()
   async getUsers(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('pageSize', new DefaultValuePipe(10), ParseIntPipe) pageSize: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
   ) {
-    return await this.usersService.getUsers(page, pageSize);
+    return await this.usersService.getUsers(page, limit);
   }
 
   @Get(':id')
   async getUserById(@Param('id') id: string) {
-    try {
-      const user = await this.usersService.getUserById(id);
-      if (!user) {
-        throw new NotFoundException(`User with id ${id} not found`);
-      }
-      return user;
-    } catch (error) {
-      throw error;
+    const user = await this.usersService.getUserById(id);
+    if (!user) {
+      throw new NotFoundException(`User with id ${id} not found`);
     }
+    return user;
   }
 
   @Post()
   @Roles(Role.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   async createUser(@Body() user: CreateUserDto) {
     return await this.usersService.createUser(user);
   }
 
   @Patch(':id')
   @Roles(Role.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   async updateUser(@Param('id') id: string, @Body() dto: UpdateUserDto) {
     return await this.usersService.updateUser(id, dto);
   }
 
   @Delete(':id')
   @Roles(Role.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   async deleteUser(@Param('id') id: string) {
     return await this.usersService.deleteUser(id);
   }
