@@ -22,7 +22,8 @@ export class UploadService {
   }> {
     const filename = file.filename;
 
-    const baseUrl = this.config.get('APP_URL') ?? 'http://localhost:3000';
+    const baseUrl =
+      this.config.get<string>('APP_URL') ?? 'http://localhost:3000';
     return Promise.resolve({
       url: `${baseUrl}/uploads/${filename}`,
       filename,

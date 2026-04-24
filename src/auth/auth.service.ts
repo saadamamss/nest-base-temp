@@ -147,7 +147,9 @@ export class AuthService {
 
     if (!valid) {
       const attempts: number = user.failedLoginAttempts + 1;
-      const updateData: any = { failedLoginAttempts: attempts };
+      const updateData: { failedLoginAttempts: number; lockedUntil?: Date } = {
+        failedLoginAttempts: attempts,
+      };
 
       // Lock account after 5 failed attempts for 30 minutes
       if (attempts >= 5) {

@@ -69,12 +69,15 @@ export class AuthController {
   @UseGuards(JwtRefreshGuard)
   @Post('refresh')
   refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    return this.authService.refresh((req.user as any).sub, res);
+    return this.authService.refresh((req.user as { sub: string }).sub, res);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('logout')
-  logout(@CurrentUser() user: any, @Res({ passthrough: true }) res: Response) {
+  logout(
+    @CurrentUser() user: { id: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
     return this.authService.logout(user.id, res);
   }
 

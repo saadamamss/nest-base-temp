@@ -16,8 +16,8 @@ export class JwtRefreshStrategy extends PassportStrategy(
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
-        (request: Request) => {
-          return request.cookies?.refresh_token;
+        (request: Request): string | null => {
+          return (request.cookies?.refresh_token as string | undefined) ?? null;
         },
       ]),
       secretOrKey: config.get('JWT_REFRESH_SECRET'),
@@ -29,7 +29,7 @@ export class JwtRefreshStrategy extends PassportStrategy(
     req: Request,
     payload: { sub: string; email: string; tokenVersion: number },
   ) {
-    const refreshToken = req.cookies?.refresh_token;
+    const refreshToken = req.cookies?.refresh_token as string | undefined;
     if (!refreshToken) throw new UnauthorizedException();
 
     const user = await this.prisma.user.findUnique({
