@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dtos/create-user.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import type { Role } from '../generated/prisma/client';
 import {
   paginate,
@@ -23,12 +24,19 @@ type PublicUser = {
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private redis: RedisService,
+  ) {}
 
   async getUsers(
     page: number,
     limit: number,
   ): Promise<PaginatedResult<PublicUser>> {
+    const cacheKey = `users:list:${page}:${limit}`;
+    const cached = await this.redis.get<PaginatedResult<PublicUser>>(cacheKey);
+    if (cached) return cached;
+
     const { skip, take } = getPrismaSkipTake({ page, limit });
 
     const [users, total] = await Promise.all([
@@ -49,7 +57,9 @@ export class UsersService {
       this.prisma.user.count(),
     ]);
 
-    return paginate(users, total, { page, limit });
+    const result = paginate(users, total, { page, limit });
+    await this.redis.set(cacheKey, result, 5 * 60); // Cache for 5 minutes (300 seconds)
+    return result;
   }
 
   async createUser(user: CreateUserDto): Promise<PublicUser | null> {
@@ -57,6 +67,7 @@ export class UsersService {
     const u = await this.prisma.user.create({
       data: { ...user, password: hashed },
     });
+    await this.invalidateUserCache();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password: _, ...result } = u;
     return result;
@@ -97,11 +108,18 @@ export class UsersService {
         updatedAt: true,
       },
     });
+    await this.invalidateUserCache();
     return updated;
   }
 
   async deleteUser(id: string): Promise<{ message: string }> {
     await this.prisma.user.delete({ where: { id } });
+    await this.invalidateUserCache();
     return { message: `User ${id} deleted successfully` };
+  }
+
+  private async invalidateUserCache() {
+    const keys = await this.redis.keys('users:list:*');
+    if (keys.length) await Promise.all(keys.map((k) => this.redis.del(k)));
   }
 }
