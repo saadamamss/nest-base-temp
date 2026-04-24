@@ -7,9 +7,16 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiBody,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UploadService } from './upload.service';
+import { FileUploadResponseDto } from '../common/dto/response.dto';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { randomUUID } from 'crypto';
@@ -21,6 +28,13 @@ import { randomUUID } from 'crypto';
 export class UploadController {
   constructor(private uploadService: UploadService) {}
 
+  @ApiResponse({
+    status: 201,
+    description: 'Image uploaded',
+    type: FileUploadResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid file type or size' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Post('image')
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -50,6 +64,12 @@ export class UploadController {
     return this.uploadService.saveFile(file);
   }
 
+  @ApiResponse({
+    status: 201,
+    description: 'File uploaded',
+    type: FileUploadResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Post('file')
   @ApiConsumes('multipart/form-data')
   @ApiBody({

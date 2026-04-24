@@ -6,7 +6,7 @@ import {
   PrismaHealthIndicator,
 } from '@nestjs/terminus';
 import { PrismaService } from '../prisma/prisma.service';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('Health')
 @Controller('health')
@@ -17,6 +17,8 @@ export class HealthController {
     private prisma: PrismaService,
   ) {}
 
+  @ApiResponse({ status: 200, description: 'Health check passed' })
+  @ApiResponse({ status: 503, description: 'Health check failed' })
   @Get()
   @HealthCheck()
   check() {

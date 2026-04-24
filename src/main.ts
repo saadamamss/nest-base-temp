@@ -3,21 +3,26 @@ import {
   ValidationPipe,
   ClassSerializerInterceptor,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import { WinstonModule } from 'nest-winston';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { winstonConfig } from './common/logger/winston.config';
 import 'dotenv/config';
 
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as path from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: WinstonModule.createLogger(winstonConfig),
+  });
   const config = app.get(ConfigService);
   const isDev = config.get('NODE_ENV') === 'development';
 
@@ -81,9 +86,10 @@ async function bootstrap() {
   }
 
   const port = config.get<string | number>('PORT') ?? 3000;
+  const logger = new Logger('Bootstrap');
   await app.listen(port);
-  console.log(`Server running on http://localhost:${port}/api/v1`);
-  if (isDev) console.log(`Swagger at http://localhost:${port}/docs`);
+  logger.log(`Server running on http://localhost:${port}/api/v1`);
+  if (isDev) logger.log(`Swagger at http://localhost:${port}/docs`);
 }
 
 void bootstrap();
